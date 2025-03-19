@@ -69,9 +69,9 @@ class Particle {
 
     // If particle is in the ground, increment the ground timer
     if (this.inGround) {
-      this.groundTimer += 16; // Increment timer by ~16ms (assuming 60 FPS)
+      this.groundTimer += 30; // Increment timer by ~16ms (assuming 60 FPS)
       // 50% chance to remove the particle every 0.05 seconds (50ms)
-      if (this.groundTimer >= 50 && Math.random() < 0.5) {
+      if (this.groundTimer >= 50 && Math.random() < 0.1) {
         this.markForRemoval = true;
         this.groundTimer = 0; // Reset the timer
       }
