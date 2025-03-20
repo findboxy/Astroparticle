@@ -11,7 +11,7 @@ body, html {
   display: block;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, #000428, #004e92); /* Sky gradient */
+  background: linear-gradient(to bottom, #000428, #004e92, #456cff); /* Sky gradient */
 }
 
 #game-container {
@@ -34,18 +34,18 @@ body, html {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 20%;
-  background: #654321; /* Brown ground */
+  height: 25%;
+  background: linear-gradient(to top, #392613, #654321); /* Brown ground */
 }
 
 #detector {
   position: absolute;
-  bottom: 10px;
+  bottom: 25%;
   left: 50%;
   transform: translateX(-50%);
   width: 50px;
   height: 50px;
-  background: red;
+  background: lightblue;
   border-radius: 50%;
 }
 

@@ -32,6 +32,9 @@ let particles = [];
 let particlesDetected = 0; // Counter for particles touching the detector
 let leadBricks = []; // Array to store lead bricks
 let selectedBrick = null; // Track the currently selected brick for dragging
+let detectorFlashTimer = 0; // Timer for detector flash effect
+let introTextAlpha = 1; // Opacity for intro text
+let introTextTimer = 2000; // Timer for intro text (2 seconds)
 
 // Particle class
 class Particle {
@@ -40,21 +43,35 @@ class Particle {
     this.y = y;
     this.speed = speed;
     this.angle = angle;
-    this.decayCount = decayCount;
-    this.decayed = false;
+    this.decayCount = decayCount; // Number of times the particle can decay
+    this.decayed = false; // Track if the particle has decayed
     this.inGround = false; // Track if the particle is in the ground
     this.groundTimer = 0; // Timer for ground penetration
     this.markForRemoval = false; // Track if the particle should be removed
+    this.decayTimer = 0; // Timer for decay delay
+    this.decayDelay = 400; // Time delay between decays (in milliseconds)
   }
 
-  update() {
+  update(deltaTime) {
     this.x += Math.tan((this.angle * Math.PI) / 180) * this.speed;
     this.y += this.speed;
 
+    // Increment the decay timer (only for secondary particles)
+    if (this.decayCount < 6) { // Only apply delay to secondary particles
+      this.decayTimer += deltaTime;
+    }
+
     // Check for decay
-    if (this.y > 100 && !this.decayed && this.decayCount > 0 && Math.random() < 0.1) {
+    if (
+      this.y > 100 && // Particle is below the decay altitude
+      !this.decayed && // Particle hasn't decayed yet
+      this.decayCount > 0 && // Particle has decays remaining
+      (this.decayCount === 6 || this.decayTimer >= this.decayDelay) && // Apply delay only to secondary particles
+      Math.random() < (this.decayCount === 6 ? 0.95 : 0.6) // 95% chance for primary decay, 60% for secondary
+    ) {
       this.decayed = true;
       this.decayCount--;
+      this.decayTimer = 0; // Reset the decay timer
       createSecondaryParticles(this);
     }
 
@@ -69,8 +86,8 @@ class Particle {
 
     // If particle is in the ground, increment the ground timer
     if (this.inGround) {
-      this.groundTimer += 30; // Increment timer by ~16ms (assuming 60 FPS)
-      // 50% chance to remove the particle every 0.05 seconds (50ms)
+      this.groundTimer += deltaTime;
+      // 10% chance to remove the particle every 0.05 seconds (50ms)
       if (this.groundTimer >= 50 && Math.random() < 0.1) {
         this.markForRemoval = true;
         this.groundTimer = 0; // Reset the timer
@@ -84,6 +101,7 @@ class Particle {
     if (distance < detectorRadius) {
       particlesDetected++;
       this.markForRemoval = true;
+      detectorFlashTimer = 100; // Start the flash effect (100ms duration)
     }
 
     // Check if particle hits a lead brick
@@ -94,7 +112,7 @@ class Particle {
         this.y >= brick.y &&
         this.y <= brick.y + brick.height
       ) {
-        if (Math.random() < 0.9) { // 90% chance to remove the particle
+        if (Math.random() < 0.4) { // 40% chance to remove the particle
           this.markForRemoval = true;
         }
       }
@@ -119,14 +137,14 @@ class LeadBrick {
   }
 
   draw() {
-    ctx.fillStyle = '#999999'; // Dark gray for lead bricks
+    ctx.fillStyle = '#999999'; // Gray color for bricks
     ctx.fillRect(this.x, this.y, this.width, this.height);
   }
 }
 
 // Function to create secondary particles
 function createSecondaryParticles(parentParticle) {
-  const angle1 = 2 + Math.random() * 3; // Random angle between 2° and 5°
+  const angle1 = 4 + Math.random() * 4; // Random angle between 4° and 8°
   const angle2 = -angle1; // Opposite angle
 
   particles.push(new Particle(parentParticle.x, parentParticle.y, parentParticle.speed * (0.9 + Math.random() * 0.2), angle1, parentParticle.decayCount));
@@ -137,7 +155,7 @@ function createSecondaryParticles(parentParticle) {
 function spawnParticle() {
   const x = Math.random() * canvas.width;
   const speed = 2 + Math.random() * 3;
-  const decayCount = Math.floor(Math.random() * 4) + 2; // Random decay count between 2 and 5
+  const decayCount = 6; // Particles can decay up to 6 times
   particles.push(new Particle(x, 0, speed, 0, decayCount));
 }
 
@@ -146,6 +164,16 @@ function drawParticleCounter() {
   ctx.fillStyle = 'white';
   ctx.font = '20px Arial';
   ctx.fillText(`Particles detected: ${particlesDetected}`, 10, 30);
+}
+
+// Function to draw the intro text
+function drawIntroText() {
+  if (introTextAlpha > 0) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${introTextAlpha})`; // White text with fading opacity
+    ctx.font = '60px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Astroparticle Physics', canvas.width / 2, canvas.height / 2);
+  }
 }
 
 // Function to initialize lead bricks
@@ -160,25 +188,14 @@ function initializeLeadBricks() {
   }
 }
 
-// Function to handle mouse events for dragging bricks
-function handleMouseEvents() {
+// Function to handle mouse and touch events for dragging bricks
+function handleMouseAndTouchEvents() {
+  // Mouse events
   canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-
-    // Check if the mouse is over a brick
-    for (const brick of leadBricks) {
-      if (
-        mouseX >= brick.x &&
-        mouseX <= brick.x + brick.width &&
-        mouseY >= brick.y &&
-        mouseY <= brick.y + brick.height
-      ) {
-        selectedBrick = brick;
-        break;
-      }
-    }
+    selectBrick(mouseX, mouseY);
   });
 
   canvas.addEventListener('mousemove', (e) => {
@@ -186,30 +203,84 @@ function handleMouseEvents() {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-
-      // Move the selected brick
-      selectedBrick.x = mouseX - selectedBrick.width / 2;
-      selectedBrick.y = mouseY - selectedBrick.height / 2;
+      moveBrick(mouseX, mouseY);
     }
   });
 
   canvas.addEventListener('mouseup', () => {
     selectedBrick = null; // Release the selected brick
   });
+
+  // Touch events
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent default touch behavior (e.g., scrolling)
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    selectBrick(touchX, touchY);
+  });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // Prevent default touch behavior
+    if (selectedBrick) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      moveBrick(touchX, touchY);
+    }
+  });
+
+  canvas.addEventListener('touchend', () => {
+    selectedBrick = null; // Release the selected brick
+  });
+}
+
+// Function to select a brick
+function selectBrick(x, y) {
+  for (const brick of leadBricks) {
+    if (
+      x >= brick.x &&
+      x <= brick.x + brick.width &&
+      y >= brick.y &&
+      y <= brick.y + brick.height
+    ) {
+      selectedBrick = brick;
+      break;
+    }
+  }
+}
+
+// Function to move a brick
+function moveBrick(x, y) {
+  if (selectedBrick) {
+    selectedBrick.x = x - selectedBrick.width / 2;
+    selectedBrick.y = y - selectedBrick.height / 2;
+  }
 }
 
 // Game loop
-function gameLoop() {
+let lastTime = 0;
+function gameLoop(currentTime) {
+  const deltaTime = currentTime - lastTime; // Calculate time since last frame
+  lastTime = currentTime;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw ground
   ctx.fillStyle = '#654321';
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 
-  // Draw detector
+  // Draw detector with flash effect
+  if (detectorFlashTimer > 0) {
+    ctx.fillStyle = 'white'; // Flash color
+    detectorFlashTimer -= deltaTime; // Decrease flash timer
+  } else {
+    ctx.fillStyle = '#3baae9'; // Default detector color
+  }
   ctx.beginPath();
   ctx.arc(detectorX, detectorY, detectorRadius, 0, Math.PI * 2);
-  ctx.fillStyle = 'red';
   ctx.fill();
 
   // Draw lead bricks
@@ -220,7 +291,7 @@ function gameLoop() {
   // Update and draw particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const particle = particles[i];
-    particle.update();
+    particle.update(deltaTime);
     particle.draw();
 
     // Remove particles marked for removal or off-screen
@@ -232,20 +303,27 @@ function gameLoop() {
   // Draw particle counter
   drawParticleCounter();
 
+  // Draw intro text
+  if (introTextTimer > 0) {
+    drawIntroText();
+    introTextTimer -= deltaTime; // Decrease intro text timer
+    introTextAlpha = introTextTimer / 2000; // Fade out over 2 seconds
+  }
+
   requestAnimationFrame(gameLoop);
 }
 
 // Initialize lead bricks
 initializeLeadBricks();
 
-// Set up mouse event listeners for dragging bricks
-handleMouseEvents();
+// Set up mouse and touch event listeners for dragging bricks
+handleMouseAndTouchEvents();
 
 // Spawn cosmic rays at regular intervals
 setInterval(spawnParticle, 500);
 
 // Start the game loop
-gameLoop();
+requestAnimationFrame(gameLoop);
 	</script>
 </body>
 </html>
