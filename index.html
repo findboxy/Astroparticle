@@ -115,6 +115,7 @@ class Particle {
       particlesDetected++;
       this.markForRemoval = true;
       detectorFlashTimer = 100; // Start the flash effect (100ms duration)
+      recordDetection();
     }
 
     // Check if particle hits a lead brick
@@ -372,7 +373,7 @@ window.addEventListener("click", function(event) {
 
 // Add click event to your detector element
 // Replace "detectorElement" with your actual detector's ID or reference
-document.getElementById("detectorElement").addEventListener("click", openDetectorModal);
+document.getElementById("detector").addEventListener("click", openDetectorModal);
 
 // Function to record a detection (call this when a particle is detected)
 function recordDetection() {
