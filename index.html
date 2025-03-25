@@ -7,7 +7,20 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  
   <canvas id="game-canvas"></canvas>
+  
+  
+  
+  <!-- Modal Structure -->
+<div id="detectorModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2>Particle Detection Rate</h2>
+    <canvas id="detectionGraph" width="500" height="300"></canvas>
+    <p>Live tracking of particles detected (5-second window)</p>
+  </div>
+</div>
 
 	
 	
@@ -312,6 +325,122 @@ function gameLoop(currentTime) {
 
   requestAnimationFrame(gameLoop);
 }
+
+
+// Modal and Graph Variables
+let modal = document.getElementById("detectorModal");
+let closeBtn = document.querySelector(".close");
+let detectionGraph = document.getElementById("detectionGraph");
+let graphCtx = detectionGraph.getContext("2d");
+
+// Data storage for the graph
+let detectionData = [];
+let graphStartTime;
+let isGraphActive = false;
+
+// Initialize with zeros
+for (let i = 0; i <= 50; i++) { // 5 seconds at 0.1s intervals
+  detectionData.push({ time: i * 0.1, count: 0 });
+}
+
+// Function to open the modal and start graphing
+function openDetectorModal() {
+  modal.style.display = "block";
+  graphStartTime = Date.now();
+  isGraphActive = true;
+  
+  // Reset data when opening
+  detectionData.forEach(point => point.count = 0);
+  
+  // Start the graph animation
+  requestAnimationFrame(updateGraph);
+}
+
+// Function to close the modal
+function closeDetectorModal() {
+  modal.style.display = "none";
+  isGraphActive = false;
+}
+
+// Event listeners
+closeBtn.addEventListener("click", closeDetectorModal);
+window.addEventListener("click", function(event) {
+  if (event.target === modal) {
+    closeDetectorModal();
+  }
+});
+
+// Add click event to your detector element
+// Replace "detectorElement" with your actual detector's ID or reference
+document.getElementById("detectorElement").addEventListener("click", openDetectorModal);
+
+// Function to record a detection (call this when a particle is detected)
+function recordDetection() {
+  if (!isGraphActive) return;
+  
+  const elapsed = (Date.now() - graphStartTime) / 1000; // in seconds
+  if (elapsed > 5) return; // Beyond our 5-second window
+  
+  // Find the appropriate time bucket (0.1s intervals)
+  const timeIndex = Math.floor(elapsed / 0.1);
+  if (timeIndex >= 0 && timeIndex < detectionData.length) {
+    detectionData[timeIndex].count++;
+  }
+}
+
+// Function to draw the graph
+function updateGraph() {
+  if (!isGraphActive) return;
+  
+  const elapsed = (Date.now() - graphStartTime) / 1000;
+  const currentIndex = Math.min(Math.floor(elapsed / 0.1), detectionData.length - 1);
+  
+  // Clear the canvas
+  graphCtx.clearRect(0, 0, detectionGraph.width, detectionGraph.height);
+  
+  // Draw axes
+  graphCtx.strokeStyle = "#000";
+  graphCtx.lineWidth = 2;
+  graphCtx.beginPath();
+  
+  // Y-axis
+  graphCtx.moveTo(50, 20);
+  graphCtx.lineTo(50, detectionGraph.height - 30);
+  
+  // X-axis
+  graphCtx.lineTo(detectionGraph.width - 20, detectionGraph.height - 30);
+  graphCtx.stroke();
+  
+  // Draw labels
+  graphCtx.fillStyle = "#000";
+  graphCtx.font = "12px Arial";
+  
+  // X-axis labels (time)
+  for (let i = 0; i <= 5; i++) {
+    const x = 50 + (i * (detectionGraph.width - 70) / 5);
+    graphCtx.fillText(i + "s", x - 5, detectionGraph.height - 10);
+  }
+  
+  // Y-axis labels (count)
+  const maxCount = Math.max(1, ...detectionData.map(d => d.count));
+  for (let i = 0; i <= maxCount; i++) {
+    const y = detectionGraph.height - 30 - (i * (detectionGraph.height - 50) / maxCount);
+    if (i % Math.ceil(maxCount/5) === 0 || i === maxCount) {
+      graphCtx.fillText(i.toString(), 30, y + 5);
+    }
+  }
+  
+  // Draw the graph
+  graphCtx.strokeStyle = "#3498db";
+  graphCtx.lineWidth = 3;
+
+
+
+
+
+
+
+
 
 // Initialize lead bricks
 initializeLeadBricks();
