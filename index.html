@@ -107,6 +107,7 @@
     let particlesDetected = 0;
     let leadBricks = [];
     let selectedBrick = null;
+    let isDragging = false;
     let detectorFlashTimer = 0;
     let introTextAlpha = 1;
     let introTextTimer = 2000;
@@ -247,8 +248,112 @@
       }
     }
 
-    function handleMouseAndTouchEvents() {
-      // ... (keep existing event handling code unchanged) ...
+    // Brick dragging functions
+    function selectBrick(x, y) {
+      for (const brick of leadBricks) {
+        if (x >= brick.x && x <= brick.x + brick.width &&
+            y >= brick.y && y <= brick.y + brick.height) {
+          selectedBrick = brick;
+          isDragging = true;
+          return;
+        }
+      }
+    }
+
+    function moveBrick(x, y) {
+      if (selectedBrick && isDragging) {
+        selectedBrick.x = x - selectedBrick.width / 2;
+        selectedBrick.y = y - selectedBrick.height / 2;
+      }
+    }
+
+    function handleMouseDown(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // First check if clicking detector (for modal)
+      const dx = mouseX - detectorX;
+      const dy = mouseY - detectorY;
+      if (Math.sqrt(dx*dx + dy*dy) < detectorRadius) {
+        detectionData = new Array(DATA_POINTS).fill(0);
+        graphStartTime = Date.now();
+        isGraphActive = true;
+        modal.style.display = 'block';
+        return;
+      }
+      
+      // Otherwise check for brick selection
+      selectBrick(mouseX, mouseY);
+    }
+
+    function handleMouseMove(e) {
+      if (selectedBrick && isDragging) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        moveBrick(mouseX, mouseY);
+      }
+    }
+
+    function handleMouseUp() {
+      isDragging = false;
+      selectedBrick = null;
+    }
+
+    function handleTouchStart(e) {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      
+      // Check detector first
+      const dx = touchX - detectorX;
+      const dy = touchY - detectorY;
+      if (Math.sqrt(dx*dx + dy*dy) < detectorRadius) {
+        detectionData = new Array(DATA_POINTS).fill(0);
+        graphStartTime = Date.now();
+        isGraphActive = true;
+        modal.style.display = 'block';
+        return;
+      }
+      
+      selectBrick(touchX, touchY);
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault();
+      if (selectedBrick && isDragging) {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+        moveBrick(touchX, touchY);
+      }
+    }
+
+    function handleTouchEnd() {
+      isDragging = false;
+      selectedBrick = null;
+    }
+
+    function setupEventListeners() {
+      // Mouse events
+      canvas.addEventListener('mousedown', handleMouseDown);
+      canvas.addEventListener('mousemove', handleMouseMove);
+      canvas.addEventListener('mouseup', handleMouseUp);
+      
+      // Touch events
+      canvas.addEventListener('touchstart', handleTouchStart);
+      canvas.addEventListener('touchmove', handleTouchMove);
+      canvas.addEventListener('touchend', handleTouchEnd);
+      
+      // Modal close button
+      closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        isGraphActive = false;
+      });
     }
 
     function drawGraph() {
@@ -320,8 +425,10 @@
       });
       particles = particles.filter(p => !p.markForRemoval && p.y <= canvas.height + 10);
 
-      // Draw UI elements
+      // Draw bricks
       leadBricks.forEach(brick => brick.draw());
+      
+      // Draw UI elements
       drawParticleCounter();
 
       if (introTextTimer > 0) {
@@ -339,28 +446,10 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // Event Listeners
-    canvas.addEventListener('click', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const dx = e.clientX - rect.left - detectorX;
-      const dy = e.clientY - rect.top - detectorY;
-      if (Math.sqrt(dx*dx + dy*dy) < detectorRadius) {
-        detectionData = new Array(DATA_POINTS).fill(0);
-        graphStartTime = Date.now();
-        isGraphActive = true;
-        modal.style.display = 'block';
-      }
-    });
-
-    closeBtn.addEventListener('click', () => {
-      modal.style.display = 'none';
-      isGraphActive = false;
-    });
-
     // Initialize game
     initializeLeadBricks();
-    handleMouseAndTouchEvents();
-    setInterval(spawnParticle, 50);
+    setupEventListeners();
+    setInterval(spawnParticle, 200);
     requestAnimationFrame(gameLoop);
   </script>
 </body>
